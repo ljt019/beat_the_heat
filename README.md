@@ -1,4 +1,4 @@
-# Embedded Rust Temperature Display
+# Temperature Exhibit with Embedded Rust
 
 This embedded Rust application is designed for a Raspberry Pi Pico. It reads data from a DHT22 temperature sensor and displays the current temperature along with the average temperature change over the last 60 readings on an HD44780 16x2 LCD. This project is part of an exhibit demonstrating how different materials can affect temperature readings.
 
