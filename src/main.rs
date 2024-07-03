@@ -36,8 +36,7 @@ use rp_pico::hal::{
 
 use embedded_hal::blocking::delay::DelayMs;
 
-use dht_sensor::dht22;
-use dht_sensor::DhtReading;
+use dht_sensor::{dht22, DhtReading};
 
 use hd44780_driver::{HD44780, DisplayMode, Cursor, CursorBlink, Display};
 
