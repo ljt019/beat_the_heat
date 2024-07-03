@@ -130,11 +130,13 @@ fn main() -> ! {
                     abs_diff > 0.1
                 }) {
                     let mut temp_str: String<32> = String::new();
-                    write!(temp_str, "Temp: {:.1} F", temp_fahrenheit).unwrap();
+                    write!(temp_str, "{:.1}", temp_fahrenheit).unwrap();
 
                     // Display the temperature on the LCD
                     lcd.clear(&mut timer.clone()).unwrap();
                     lcd.write_str(&temp_str, &mut timer.clone()).unwrap();
+                    lcd.write_bytes(&[0xDF], &mut timer.clone()).unwrap();
+                    lcd.write_str(" F", &mut timer.clone()).unwrap();
 
                     // Update the last displayed temperature
                     last_temp_fahrenheit = Some(temp_fahrenheit);
