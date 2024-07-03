@@ -130,7 +130,7 @@ fn main() -> ! {
                     abs_diff > 0.1
                 }) {
                     let mut temp_str: String<32> = String::new();
-                    write!(temp_str, "Temp: {:.1}F", temp_fahrenheit).unwrap();
+                    write!(temp_str, "Temp: {:.1} F", temp_fahrenheit).unwrap();
 
                     // Display the temperature on the LCD
                     lcd.clear(&mut timer.clone()).unwrap();
