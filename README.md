@@ -30,8 +30,8 @@ This embedded Rust application is designed for a Raspberry Pi Pico. It reads dat
 3. **Clone the Repository:**
 
    ```sh
-   git clone <https://github.com/ljt019/temperature_exhibit.git>
-   cd <temperature_exhibit>
+   git clone https://github.com/ljt019/temperature_exhibit.git
+   cd temperature_exhibit
    ```
 
 4. **Build and Flash:**
