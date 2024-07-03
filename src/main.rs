@@ -3,7 +3,7 @@
 //! Measures the temperature using an asair dht22 sensor and displays it on a 1602 16x2 LCD Display
 //!
 //! The display is connected to the I2C bus on GPIO 4 and GPIO 5 (the default i2c pins on pi).
-//! 
+//!
 //! The temperature sensor is connected to GPIO 0.
 //!
 //! Ignore humidity data.
@@ -26,22 +26,24 @@ use rp_pico::hal::pac;
 // Raspberry Pi Pico crate imports for hardware access
 use rp_pico::hal::{
     clocks::init_clocks_and_plls,
-    sio::Sio,
-    watchdog::Watchdog,
-    gpio::{ Pins, Pin, bank0::Gpio5, bank0::Gpio4, PullUp, InOutPin, FunctionSioOutput, FunctionI2C},
     fugit::RateExtU32,
-    I2C,
+    gpio::{
+        bank0::Gpio4, bank0::Gpio5, FunctionI2C, FunctionSioOutput, InOutPin, Pin, Pins, PullUp,
+    },
+    sio::Sio,
     timer::Timer,
+    watchdog::Watchdog,
+    I2C,
 };
 
 use embedded_hal::blocking::delay::DelayMs;
 
 use dht_sensor::{dht22, DhtReading};
 
-use hd44780_driver::{HD44780, DisplayMode, Cursor, CursorBlink, Display};
+use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
 
-use heapless::String; // v0.7.11
-use core::fmt::Write; // For the write! macro
+use core::fmt::Write;
+use heapless::String; // v0.7.11 // For the write! macro
 
 #[entry]
 fn main() -> ! {
@@ -97,26 +99,46 @@ fn main() -> ! {
     lcd.reset(&mut timer.clone()).unwrap();
 
     // Set display mode
-    lcd.set_display_mode(DisplayMode {
-        display: Display::On,
-        cursor_visibility: Cursor::Invisible,
-        cursor_blink: CursorBlink::Off,
-    }, &mut timer.clone()).unwrap();
+    lcd.set_display_mode(
+        DisplayMode {
+            display: Display::On,
+            cursor_visibility: Cursor::Invisible,
+            cursor_blink: CursorBlink::Off,
+        },
+        &mut timer.clone(),
+    )
+    .unwrap();
 
     // Clear the display
     lcd.clear(&mut timer.clone()).unwrap();
 
+    let mut last_temp_fahrenheit: Option<f32> = None;
+
     loop {
-        match dht22::Reading::read(&mut timer.clone(), &mut gpio0)  {
-            Ok(dht22::Reading { temperature, relative_humidity: _, }) => {
+        match dht22::Reading::read(&mut timer.clone(), &mut gpio0) {
+            Ok(dht22::Reading {
+                temperature,
+                relative_humidity: _,
+            }) => {
                 let temp_celsius = temperature as f32;
                 let temp_fahrenheit = temp_celsius * 9.0 / 5.0 + 32.0;
-                let mut temp_str: String<32> = String::new();
-                write!(temp_str, "Temp: {:.1}F", temp_fahrenheit).unwrap();
-                
-                // Display the temperature on the LCD
-                lcd.clear(&mut timer.clone()).unwrap();
-                lcd.write_str(&temp_str, &mut timer.clone()).unwrap();
+
+                if last_temp_fahrenheit.map_or(true, |last_temp| {
+                    let diff = temp_fahrenheit - last_temp;
+                    // Manually calculate the absolute value of the difference
+                    let abs_diff = if diff < 0.0 { -diff } else { diff };
+                    abs_diff > 0.1
+                }) {
+                    let mut temp_str: String<32> = String::new();
+                    write!(temp_str, "Temp: {:.1}F", temp_fahrenheit).unwrap();
+
+                    // Display the temperature on the LCD
+                    lcd.clear(&mut timer.clone()).unwrap();
+                    lcd.write_str(&temp_str, &mut timer.clone()).unwrap();
+
+                    // Update the last displayed temperature
+                    last_temp_fahrenheit = Some(temp_fahrenheit);
+                }
             }
             Err(_) => {
                 continue;
