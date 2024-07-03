@@ -98,6 +98,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dht-sensor"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74d643854f324f02daea7153ebbfec5cfcc2f395faf1c7011be65e543570de28"
+dependencies = [
+ "embedded-hal 0.2.7",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -219,9 +228,10 @@ dependencies = [
 [[package]]
 name = "hd44780-driver"
 version = "0.4.0"
-source = "git+https://github.com/JohnDoneth/hd44780-driver.git?rev=ad597b8#ad597b87e2e65f7894739730013e4b0a127b06f3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aab2b13fdeaed7dde9133a57c28b2cbde4a8fc8c3196b5631428aad114857d3a"
 dependencies = [
- "embedded-hal 1.0.0",
+ "embedded-hal 0.2.7",
 ]
 
 [[package]]
@@ -294,9 +304,11 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 name = "pi_pico_blink"
 version = "0.1.0"
 dependencies = [
+ "cortex-m",
  "cortex-m-rt",
  "dht-embedded",
- "embedded-hal 1.0.0",
+ "dht-sensor",
+ "embedded-hal 0.2.7",
  "fugit",
  "hd44780-driver",
  "heapless",
