@@ -5,7 +5,6 @@
 //! The display is connected to the I2C bus on GPIO 4 and GPIO 5 (the default i2c pins on pi).
 //!
 //! The temperature sensor is connected to GPIO 0.
-//!
 //! Ignore humidity data.
 //!
 //! See the `Cargo.toml` file for Copyright and license details.
@@ -43,7 +42,7 @@ use dht_sensor::{dht22, DhtReading};
 use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
 
 use core::fmt::Write;
-use heapless::String; // v0.7.11 // For the write! macro
+use heapless::{String, Vec}; // v0.7.11 // For the write! macro
 
 #[entry]
 fn main() -> ! {
@@ -67,6 +66,11 @@ fn main() -> ! {
     .unwrap();
 
     let timer = Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+
+    // Set up timer clones
+    let mut lcd_timer = timer.clone();
+    let mut dht22_timer = timer.clone();
+    let mut delay_timer = timer.clone();
 
     // Set up the pins
     let pins = Pins::new(
@@ -92,8 +96,7 @@ fn main() -> ! {
     );
 
     // Initialize LCD with cloned timer
-    let mut timer_clone_for_lcd = timer.clone();
-    let mut lcd = HD44780::new_i2c(i2c, 0x3F, &mut timer_clone_for_lcd).unwrap();
+    let mut lcd = HD44780::new_i2c(i2c, 0x3F, &mut lcd_timer).unwrap();
 
     // Initialize the LCD
     lcd.reset(&mut timer.clone()).unwrap();
@@ -113,15 +116,24 @@ fn main() -> ! {
     lcd.clear(&mut timer.clone()).unwrap();
 
     let mut last_temp_fahrenheit: Option<f32> = None;
+    let mut last_10_temps: Vec<f32, 10> = Vec::new();
+    let mut last_50_temps: Vec<f32, 50> = Vec::new();
 
     loop {
-        match dht22::Reading::read(&mut timer.clone(), &mut gpio0) {
+        match dht22::Reading::read(&mut dht22_timer, &mut gpio0) {
             Ok(dht22::Reading {
                 temperature,
                 relative_humidity: _,
             }) => {
-                let temp_celsius = temperature as f32;
-                let temp_fahrenheit = temp_celsius * 9.0 / 5.0 + 32.0;
+                let temp_fahrenheit = temperature as f32 * 9.0 / 5.0 + 32.0;
+
+                // Average of last 10 temps
+                let avg_temp_last_10: f32 =
+                    last_10_temps.iter().sum::<f32>() / last_10_temps.len() as f32;
+
+                // Average of last 50 temps
+                let avg_temp_last_50: f32 =
+                    last_50_temps.iter().sum::<f32>() / last_50_temps.len() as f32;
 
                 if last_temp_fahrenheit.map_or(true, |last_temp| {
                     let diff = temp_fahrenheit - last_temp;
@@ -130,22 +142,76 @@ fn main() -> ! {
                     abs_diff > 0.1
                 }) {
                     let mut temp_str: String<32> = String::new();
-                    write!(temp_str, "{:.1}", temp_fahrenheit).unwrap();
-
-                    // Display the temperature on the LCD
-                    lcd.clear(&mut timer.clone()).unwrap();
-                    lcd.write_str(&temp_str, &mut timer.clone()).unwrap();
-                    lcd.write_bytes(&[0xDF], &mut timer.clone()).unwrap();
-                    lcd.write_str(" F", &mut timer.clone()).unwrap();
+                    let mut percent_diff_str: String<32> = String::new();
 
                     // Update the last displayed temperature
                     last_temp_fahrenheit = Some(temp_fahrenheit);
+
+                    // Last 10 temps
+                    if last_10_temps.len() == 10 {
+                        last_10_temps.remove(0);
+                    }
+
+                    last_10_temps.push(temp_fahrenheit).unwrap();
+
+                    // Last 50 temps
+                    if last_50_temps.len() == 50 {
+                        last_50_temps.remove(0);
+                    }
+
+                    last_50_temps.push(temp_fahrenheit).unwrap();
+
+                    let percent_diff =
+                        ((avg_temp_last_10 - avg_temp_last_50) / avg_temp_last_50) * 100.0;
+
+                    // format the temperature and percent difference strings and store them in the respective variables
+                    write!(temp_str, "{:.2}", avg_temp_last_10).unwrap();
+                    write!(percent_diff_str, "{:+.2}%", percent_diff).unwrap();
+
+                    // Clear the display
+                    lcd.clear(&mut lcd_timer).unwrap();
+
+                    // Set cursor to the first position
+                    lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
+
+                    // Write the temperature including the degree symbol and Farenheit sign
+                    lcd.write_str(&temp_str, &mut lcd_timer).unwrap();
+                    lcd.write_bytes(&[0xDF], &mut lcd_timer).unwrap();
+                    lcd.write_str(" F", &mut lcd_timer).unwrap();
+
+                    // Set cursor to the second line
+                    lcd.set_cursor_pos(0x40, &mut lcd_timer).unwrap();
+
+                    if last_50_temps.len() == 50 {
+                        // Write the percent difference
+                        lcd.write_str(&percent_diff_str, &mut lcd_timer).unwrap();
+                    } else {
+                        let progress = last_50_temps.len() / 3; // Divide by 3 to get the segment index
+                        match progress {
+                            0 => lcd.write_str("[              ]", &mut lcd_timer).unwrap(),
+                            1 => lcd.write_str("[=             ]", &mut lcd_timer).unwrap(),
+                            2 => lcd.write_str("[==            ]", &mut lcd_timer).unwrap(),
+                            3 => lcd.write_str("[===           ]", &mut lcd_timer).unwrap(),
+                            4 => lcd.write_str("[====          ]", &mut lcd_timer).unwrap(),
+                            5 => lcd.write_str("[=====         ]", &mut lcd_timer).unwrap(),
+                            6 => lcd.write_str("[======        ]", &mut lcd_timer).unwrap(),
+                            7 => lcd.write_str("[=======       ]", &mut lcd_timer).unwrap(),
+                            8 => lcd.write_str("[========      ]", &mut lcd_timer).unwrap(),
+                            9 => lcd.write_str("[=========     ]", &mut lcd_timer).unwrap(),
+                            10 => lcd.write_str("[==========    ]", &mut lcd_timer).unwrap(),
+                            11 => lcd.write_str("[===========   ]", &mut lcd_timer).unwrap(),
+                            12 => lcd.write_str("[============  ]", &mut lcd_timer).unwrap(),
+                            13 => lcd.write_str("[============= ]", &mut lcd_timer).unwrap(),
+                            14 => lcd.write_str("[==============]", &mut lcd_timer).unwrap(),
+                            _ => (),
+                        }
+                    }
                 }
             }
             Err(_) => {
                 continue;
             }
         }
-        timer.clone().delay_ms(2100);
+        delay_timer.delay_ms(2100);
     }
 }
